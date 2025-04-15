@@ -15,10 +15,13 @@ document.addEventListener("DOMContentLoaded", () => {
   const auth = getAuth();
   const db = getDatabase();
 
+  // Global mapping of deviceId to heartbeat info: { value: <alive_value>, time: <timestamp> }
+  let heartbeatTimestamps = {};
+
   // Listen for auth state changes to update UID, username, and load devices
   auth.onAuthStateChanged(user => {
     if (user) {
-      // Update UID display
+      // Update UID display immediately
       userUIDSpan.textContent = user.uid;
       
       // Retrieve and update username from user's profile
@@ -32,7 +35,7 @@ document.addEventListener("DOMContentLoaded", () => {
           displayNameSpan.textContent = "User";
         });
       
-      // Load device list for the current user
+      // Load device list for this user
       loadDeviceList(user.uid);
     }
   });
@@ -41,7 +44,7 @@ document.addEventListener("DOMContentLoaded", () => {
   function loadDeviceList(uid) {
     const devicesRef = ref(db, "users/" + uid + "/devices");
     onValue(devicesRef, snapshot => {
-      deviceListDiv.innerHTML = ""; // Clear current content
+      deviceListDiv.innerHTML = ""; // Clear existing content
       if (snapshot.exists()) {
         const devices = snapshot.val();
         Object.entries(devices).forEach(([deviceId, deviceData]) => {
@@ -52,7 +55,7 @@ document.addEventListener("DOMContentLoaded", () => {
   
           // Create and insert status dot at top-left
           const statusDot = document.createElement("span");
-          statusDot.className = "status-dot online"; // assume online initially
+          statusDot.className = "status-dot online"; // Assume online initially
           deviceCard.appendChild(statusDot);
   
           // Device name element
@@ -80,21 +83,25 @@ document.addEventListener("DOMContentLoaded", () => {
           };
           deviceCard.appendChild(reconfigureBtn);
   
-          // Always create and display the switch feedback
+          // Create or update the feedback status paragraph
           const feedbackPara = document.createElement("p");
           feedbackPara.className = "feedback-status";
           feedbackPara.textContent = "Feedback: " + ((deviceData.switchFeedback == 1) ? "ON" : "OFF");
           deviceCard.appendChild(feedbackPara);
   
-          // Set last heartbeat update time if "alive" exists
+          // Handle heartbeat ("alive") data without overwriting lastUpdate on every onValue callback:
           if (deviceData.hasOwnProperty("alive")) {
-            deviceCard.dataset.lastUpdate = Date.now();
+            // If we haven't stored a heartbeat for this device or if it has changed:
+            if (!heartbeatTimestamps[deviceId] || heartbeatTimestamps[deviceId].value != deviceData.alive) {
+              heartbeatTimestamps[deviceId] = { value: deviceData.alive, time: Date.now() };
+            }
+            // Set the data attribute to the stored timestamp
+            deviceCard.dataset.lastUpdate = heartbeatTimestamps[deviceId].time;
           } else {
-            // If no heartbeat data, set to 0
             deviceCard.dataset.lastUpdate = "0";
           }
   
-          // Optionally display the heartbeat value for debugging
+          // Optionally display the alive value for debugging
           if (deviceData.hasOwnProperty("alive")) {
             const alivePara = document.createElement("p");
             alivePara.textContent = "Heartbeat: " + deviceData.alive;
@@ -116,7 +123,7 @@ document.addEventListener("DOMContentLoaded", () => {
     deviceCards.forEach(card => {
       const lastUpdate = parseInt(card.dataset.lastUpdate) || 0;
       const statusDot = card.querySelector(".status-dot");
-      // If more than 6000ms have passed since last update, mark as offline; otherwise online
+      // If more than 6000ms have passed since last heartbeat update, mark as offline; otherwise online.
       if (now - lastUpdate > 6000) {
         statusDot.classList.remove("online");
         statusDot.classList.add("offline");
@@ -127,29 +134,25 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   }, 2000);
   
-  // Modal: Show when floating button is clicked
+  // Modal functionality
   addNodeBtn.addEventListener("click", () => {
     instructionsModal.style.display = "block";
   });
   
-  // Modal: Close when close icon is clicked
   closeInstructions.addEventListener("click", () => {
     instructionsModal.style.display = "none";
   });
   
-  // Modal: Close if clicking outside modal content
   window.addEventListener("click", (event) => {
     if (event.target === instructionsModal) {
       instructionsModal.style.display = "none";
     }
   });
   
-  // "Create New Now" button: Open the ESP provisioning page in a new tab
   createNewBtn.addEventListener("click", () => {
     window.open("http://192.168.4.1", "_blank");
   });
   
-  // Copy UID button: Copy UID text to clipboard
   copyUIDBtn.addEventListener("click", () => {
     const uidText = userUIDSpan.textContent;
     navigator.clipboard.writeText(uidText)
