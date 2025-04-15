@@ -1,6 +1,13 @@
 // dashboard/dashboard.js
 import { getAuth } from "https://www.gstatic.com/firebasejs/11.6.0/firebase-auth.js";
-import { getDatabase, ref, get, child } from "https://www.gstatic.com/firebasejs/11.6.0/firebase-database.js";
+import {
+  getDatabase,
+  ref,
+  get,
+  child,
+  onValue,
+  update
+} from "https://www.gstatic.com/firebasejs/11.6.0/firebase-database.js";
 
 document.addEventListener("DOMContentLoaded", () => {
   // Modal elements
@@ -11,17 +18,18 @@ document.addEventListener("DOMContentLoaded", () => {
   const copyUIDBtn = document.getElementById("copyUIDBtn");
   const userUIDSpan = document.getElementById("userUID");
   const displayNameSpan = document.getElementById("displayName");
+  const deviceListDiv = document.getElementById("device-list");
 
   const auth = getAuth();
   const db = getDatabase();
-  
-  // Listen for auth state changes to update UID and username
+
+  // Listen for auth state changes
   auth.onAuthStateChanged(user => {
     if (user) {
-      // Update UID display immediately
+      // Immediately update UID in the instructions modal
       userUIDSpan.textContent = user.uid;
       
-      // Retrieve username from "users/<uid>/profile/username"
+      // Retrieve username from "users/<uid>/profile/username" and update header greeting
       const userProfileRef = ref(db, "users/" + user.uid + "/profile");
       get(child(userProfileRef, "username"))
         .then(snapshot => {
@@ -35,45 +43,85 @@ document.addEventListener("DOMContentLoaded", () => {
           console.error("Error fetching username:", error);
           displayNameSpan.textContent = "User";
         });
+      
+      // Retrieve all devices for this user and render them
+      const devicesRef = ref(db, "users/" + user.uid + "/devices");
+      onValue(devicesRef, snapshot => {
+        deviceListDiv.innerHTML = ""; // Clear previous device cards
+        if (snapshot.exists()) {
+          const devices = snapshot.val();
+          Object.entries(devices).forEach(([deviceId, deviceData]) => {
+            renderDevice(deviceId, deviceData, user.uid);
+          });
+        } else {
+          deviceListDiv.innerHTML = "<p>No devices found.</p>";
+        }
+      });
     }
   });
-  
-  // Modal: Show when floating button is clicked
+
+  // Function to render a device card
+  function renderDevice(deviceId, data, uid) {
+    const deviceCard = document.createElement("div");
+    deviceCard.className = "device-card";
+
+    // Device name
+    const nameElem = document.createElement("h3");
+    nameElem.textContent = data.name || deviceId;
+
+    // Toggle button to change switch state
+    const toggleBtn = document.createElement("button");
+    toggleBtn.className = "switch-btn";
+    toggleBtn.textContent = data.switch ? "Turn Off" : "Turn On";
+    toggleBtn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      const newState = !data.switch;
+      update(ref(db, "users/" + uid + "/devices/" + deviceId), { switch: newState });
+    });
+
+    // Reconfigure button sends a reset signal
+    const resetBtn = document.createElement("button");
+    resetBtn.className = "reconfigure-btn";
+    resetBtn.textContent = "Reconfigure";
+    resetBtn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      update(ref(db, "users/" + uid + "/devices/" + deviceId), { reset: true });
+      alert("Reset signal sent to device.");
+    });
+
+    deviceCard.appendChild(nameElem);
+    deviceCard.appendChild(toggleBtn);
+    deviceCard.appendChild(resetBtn);
+
+    deviceListDiv.appendChild(deviceCard);
+  }
+
+  // Modal functionality
   addNodeBtn.addEventListener("click", () => {
     instructionsModal.style.display = "block";
   });
-  
-  // Modal: Close when close icon is clicked
   closeInstructions.addEventListener("click", () => {
     instructionsModal.style.display = "none";
   });
-  
-  // Modal: Close if clicking outside modal content
   window.addEventListener("click", (event) => {
     if (event.target === instructionsModal) {
       instructionsModal.style.display = "none";
     }
   });
-  
-  // "Create New Now" button: Open provisioning page in a new tab
   createNewBtn.addEventListener("click", () => {
     window.open("http://192.168.4.1", "_blank");
   });
-  
-  // Copy UID button: Copy UID text to clipboard
   copyUIDBtn.addEventListener("click", () => {
     const uidText = userUIDSpan.textContent;
     navigator.clipboard.writeText(uidText)
       .then(() => {
         copyUIDBtn.textContent = "Copied!";
-        setTimeout(() => {
-          copyUIDBtn.textContent = "Copy";
-        }, 2000);
+        setTimeout(() => { copyUIDBtn.textContent = "Copy"; }, 2000);
       })
       .catch((err) => {
         console.error("Failed to copy UID:", err);
       });
   });
-  
+
   console.log("Dashboard JS loaded and ready.");
 });
