@@ -3,7 +3,6 @@ import { getAuth } from "https://www.gstatic.com/firebasejs/11.6.0/firebase-auth
 import { getDatabase, ref, onValue, get, child, update } from "https://www.gstatic.com/firebasejs/11.6.0/firebase-database.js";
 
 document.addEventListener("DOMContentLoaded", () => {
-  // Modal elements
   const addNodeBtn = document.getElementById("addNodeFloatingBtn");
   const instructionsModal = document.getElementById("nodeInstructionsModal");
   const closeInstructions = document.getElementById("closeInstructions");
@@ -16,45 +15,47 @@ document.addEventListener("DOMContentLoaded", () => {
   const auth = getAuth();
   const db = getDatabase();
 
-  // Listen for auth state changes to update UID and username
+  // Listen for auth state changes to update UID and username, and load devices
   auth.onAuthStateChanged(user => {
     if (user) {
-      // Update UID display immediately
+      // Update UID display
       userUIDSpan.textContent = user.uid;
       
-      // Retrieve username from "users/<uid>/profile/username"
+      // Retrieve and update username
       const userProfileRef = ref(db, "users/" + user.uid + "/profile");
       get(child(userProfileRef, "username"))
         .then(snapshot => {
-          if (snapshot.exists()) {
-            displayNameSpan.textContent = snapshot.val();
-          } else {
-            displayNameSpan.textContent = "User";
-          }
+          displayNameSpan.textContent = snapshot.exists() ? snapshot.val() : "User";
         })
         .catch(error => {
           console.error("Error fetching username:", error);
           displayNameSpan.textContent = "User";
         });
       
-      // Load device list for the current user
+      // Load the device list for this user
       loadDeviceList(user.uid);
     }
   });
   
-  // Function to load device list
+  // Function to load devices
   function loadDeviceList(uid) {
     const devicesRef = ref(db, "users/" + uid + "/devices");
     onValue(devicesRef, snapshot => {
-      deviceListDiv.innerHTML = ""; // Clear existing devices
+      deviceListDiv.innerHTML = ""; // Clear current content
       if (snapshot.exists()) {
         const devices = snapshot.val();
         Object.entries(devices).forEach(([deviceId, deviceData]) => {
           // Create device card
           const deviceCard = document.createElement("div");
           deviceCard.className = "device-card";
+          deviceCard.id = "device-" + deviceId;
   
-          // Device name
+          // Create and insert status dot at top-left
+          const statusDot = document.createElement("span");
+          statusDot.className = "status-dot online"; // assume online initially
+          deviceCard.appendChild(statusDot);
+  
+          // Device name element
           const nameH3 = document.createElement("h3");
           nameH3.textContent = deviceData.name || deviceId;
           deviceCard.appendChild(nameH3);
@@ -62,7 +63,6 @@ document.addEventListener("DOMContentLoaded", () => {
           // Switch button
           const toggleBtn = document.createElement("button");
           toggleBtn.className = "switch-btn";
-          // Use deviceData.switch state to determine text (assuming Boolean)
           toggleBtn.textContent = deviceData.switch ? "Turn Off" : "Turn On";
           toggleBtn.onclick = () => {
             const newState = !deviceData.switch;
@@ -80,6 +80,21 @@ document.addEventListener("DOMContentLoaded", () => {
           };
           deviceCard.appendChild(reconfigureBtn);
   
+          // Set last heartbeat update time using current timestamp if "alive" exists
+          if (deviceData.hasOwnProperty("alive")) {
+            deviceCard.dataset.lastUpdate = Date.now();
+          } else {
+            // If no heartbeat data, set a very old timestamp so it shows offline
+            deviceCard.dataset.lastUpdate = "0";
+          }
+  
+          // Optional: display the alive number for debugging
+          if (deviceData.hasOwnProperty("alive")) {
+            const alivePara = document.createElement("p");
+            alivePara.textContent = "Heartbeat: " + deviceData.alive;
+            deviceCard.appendChild(alivePara);
+          }
+  
           deviceListDiv.appendChild(deviceCard);
         });
       } else {
@@ -87,6 +102,24 @@ document.addEventListener("DOMContentLoaded", () => {
       }
     });
   }
+  
+  // Set an interval to check heartbeat status every 5 seconds
+  setInterval(() => {
+    const deviceCards = document.querySelectorAll(".device-card");
+    const now = Date.now();
+    deviceCards.forEach(card => {
+      const lastUpdate = parseInt(card.dataset.lastUpdate) || 0;
+      const statusDot = card.querySelector(".status-dot");
+      // If more than 6000ms have passed since last update, mark as offline
+      if (now - lastUpdate > 6000) {
+        statusDot.classList.remove("online");
+        statusDot.classList.add("offline");
+      } else {
+        statusDot.classList.remove("offline");
+        statusDot.classList.add("online");
+      }
+    });
+  }, 5000);
   
   // Modal: Show when floating button is clicked
   addNodeBtn.addEventListener("click", () => {

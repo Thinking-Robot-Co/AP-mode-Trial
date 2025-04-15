@@ -36,6 +36,7 @@ header {
     margin: 10px;
     display: inline-block;
     vertical-align: top;
+    position: relative;
   }
   .device-card h3 {
     margin: 0 0 10px;
@@ -138,5 +139,22 @@ header {
     padding: 4px 8px;
     font-size: 0.8em;
     cursor: pointer;
+  }
+  
+  /* Status dot for heartbeat */
+  .status-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    display: inline-block;
+    position: absolute;
+    top: 10px;
+    left: 10px;
+  }
+  .status-dot.online {
+    background-color: green;
+  }
+  .status-dot.offline {
+    background-color: red;
   }
   
