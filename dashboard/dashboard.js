@@ -41,7 +41,7 @@ document.addEventListener("DOMContentLoaded", () => {
   function loadDeviceList(uid) {
     const devicesRef = ref(db, "users/" + uid + "/devices");
     onValue(devicesRef, snapshot => {
-      deviceListDiv.innerHTML = ""; // Clear existing content
+      deviceListDiv.innerHTML = ""; // Clear current content
       if (snapshot.exists()) {
         const devices = snapshot.val();
         Object.entries(devices).forEach(([deviceId, deviceData]) => {
@@ -52,7 +52,7 @@ document.addEventListener("DOMContentLoaded", () => {
   
           // Create and insert status dot at top-left
           const statusDot = document.createElement("span");
-          statusDot.className = "status-dot online"; // default assumes online
+          statusDot.className = "status-dot online"; // assume online initially
           deviceCard.appendChild(statusDot);
   
           // Device name element
@@ -80,20 +80,21 @@ document.addEventListener("DOMContentLoaded", () => {
           };
           deviceCard.appendChild(reconfigureBtn);
   
-          // Always create and display the switch feedback status
+          // Always create and display the switch feedback
           const feedbackPara = document.createElement("p");
           feedbackPara.className = "feedback-status";
           feedbackPara.textContent = "Feedback: " + ((deviceData.switchFeedback == 1) ? "ON" : "OFF");
           deviceCard.appendChild(feedbackPara);
   
-          // Set last heartbeat update time using the "heartbeatTime" value if available; otherwise, 0.
-          if (deviceData.hasOwnProperty("heartbeatTime")) {
-            deviceCard.dataset.lastUpdate = deviceData.heartbeatTime;
+          // Set last heartbeat update time if "alive" exists
+          if (deviceData.hasOwnProperty("alive")) {
+            deviceCard.dataset.lastUpdate = Date.now();
           } else {
+            // If no heartbeat data, set to 0
             deviceCard.dataset.lastUpdate = "0";
           }
   
-          // Optionally display the alive number for debugging
+          // Optionally display the heartbeat value for debugging
           if (deviceData.hasOwnProperty("alive")) {
             const alivePara = document.createElement("p");
             alivePara.textContent = "Heartbeat: " + deviceData.alive;
@@ -115,7 +116,7 @@ document.addEventListener("DOMContentLoaded", () => {
     deviceCards.forEach(card => {
       const lastUpdate = parseInt(card.dataset.lastUpdate) || 0;
       const statusDot = card.querySelector(".status-dot");
-      // If more than 6000ms have passed since the last heartbeat update, mark offline
+      // If more than 6000ms have passed since last update, mark as offline; otherwise online
       if (now - lastUpdate > 6000) {
         statusDot.classList.remove("online");
         statusDot.classList.add("offline");
@@ -126,25 +127,29 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   }, 2000);
   
-  // Modal behavior
+  // Modal: Show when floating button is clicked
   addNodeBtn.addEventListener("click", () => {
     instructionsModal.style.display = "block";
   });
   
+  // Modal: Close when close icon is clicked
   closeInstructions.addEventListener("click", () => {
     instructionsModal.style.display = "none";
   });
   
+  // Modal: Close if clicking outside modal content
   window.addEventListener("click", (event) => {
     if (event.target === instructionsModal) {
       instructionsModal.style.display = "none";
     }
   });
   
+  // "Create New Now" button: Open the ESP provisioning page in a new tab
   createNewBtn.addEventListener("click", () => {
     window.open("http://192.168.4.1", "_blank");
   });
   
+  // Copy UID button: Copy UID text to clipboard
   copyUIDBtn.addEventListener("click", () => {
     const uidText = userUIDSpan.textContent;
     navigator.clipboard.writeText(uidText)
