@@ -8,7 +8,7 @@
   <link rel="stylesheet" href="dashboard/dashboard.css" />
 </head>
 <body>
-  <!-- Header with greeting and Logout -->
+  <!-- Header with greeting and Logout button -->
   <header>
     <div class="header-content">
       <h2>Hello, <span id="displayName">User</span>!</h2>
@@ -18,10 +18,10 @@
     </div>
   </header>
   
-  <!-- Main content area for devices -->
+  <!-- Main container for devices -->
   <div class="container">
     <div id="device-list">
-      <!-- Example Device Card (to be replaced with dynamic content) -->
+      <!-- Device cards will eventually load dynamically -->
       <div class="device-card">
         <h3>Device 1</h3>
         <button class="switch-btn">Turn On</button>
@@ -33,22 +33,23 @@
   <!-- Floating Add Node Button -->
   <button class="floating-btn" id="addNodeFloatingBtn">+</button>
   
-  <!-- Modal Popup for Node Addition Instructions -->
+  <!-- Modal for Node Addition Instructions -->
   <div id="nodeInstructionsModal" class="modal instruction-modal">
     <div class="modal-content instruction-content">
       <span class="close" id="closeInstructions">&times;</span>
       <h3>How to Add a New Node</h3>
       <!-- Display the user's UID with a copy button -->
-      <p>Your UID: <span id="userUID">[Loading UID...]</span>
+      <p>
+        Your UID: <span id="userUID">[Loading UID...]</span>
         <button id="copyUIDBtn" title="Copy UID">Copy</button>
       </p>
       <ol>
         <li>Click the "+ Add Node" button.</li>
-        <li>Connect to the device's WiFi (e.g. "TRC_IoT_Config").</li>
+        <li>Connect to the device's WiFi (e.g., "TRC_IoT_Config").</li>
         <li>Open the provisioning page at <code>http://192.168.4.1</code> in your browser.</li>
-        <li>Fill in the device configuration details (SSID, WiFi password, Device Name, and paste your UID in the field).</li>
+        <li>Fill in the device details (SSID, WiFi password, Device Name) and paste your UID into the form.</li>
         <li>Reconnect to your home WiFi and return to this dashboard.</li>
-        <li>Your new device will appear on the dashboard automatically.</li>
+        <li>Your device will then appear automatically.</li>
       </ol>
       <button id="createNewBtn" class="create-new-btn">Create New Now</button>
     </div>
