@@ -18,10 +18,10 @@ document.addEventListener("DOMContentLoaded", () => {
   // Listen for auth state changes to update UID, username, and load devices
   auth.onAuthStateChanged(user => {
     if (user) {
-      // Update UID display
+      // Update UID display immediately
       userUIDSpan.textContent = user.uid;
       
-      // Retrieve and update username from user's profile
+      // Retrieve username from "users/<uid>/profile/username"
       const userProfileRef = ref(db, "users/" + user.uid + "/profile");
       get(child(userProfileRef, "username"))
         .then(snapshot => {
@@ -45,14 +45,14 @@ document.addEventListener("DOMContentLoaded", () => {
       if (snapshot.exists()) {
         const devices = snapshot.val();
         Object.entries(devices).forEach(([deviceId, deviceData]) => {
-          // Create device card
+          // Create a new device card element
           const deviceCard = document.createElement("div");
           deviceCard.className = "device-card";
           deviceCard.id = "device-" + deviceId;
   
           // Create and insert status dot at top-left
           const statusDot = document.createElement("span");
-          statusDot.className = "status-dot online"; // assume online initially
+          statusDot.className = "status-dot online"; // default online (it will be updated in heartbeat check)
           deviceCard.appendChild(statusDot);
   
           // Device name element
@@ -80,21 +80,27 @@ document.addEventListener("DOMContentLoaded", () => {
           };
           deviceCard.appendChild(reconfigureBtn);
   
-          // Always create and display the switch feedback
+          // Always create and display the switch feedback field
           const feedbackPara = document.createElement("p");
           feedbackPara.className = "feedback-status";
           feedbackPara.textContent = "Feedback: " + ((deviceData.switchFeedback == 1) ? "ON" : "OFF");
           deviceCard.appendChild(feedbackPara);
   
-          // Set last heartbeat update time if "alive" exists
+          // Handle heartbeat update: Only update lastUpdate if "alive" has changed
           if (deviceData.hasOwnProperty("alive")) {
-            deviceCard.dataset.lastUpdate = Date.now();
+            // Compare with stored alive value in dataset (if any)
+            if (deviceCard.dataset.aliveValue !== String(deviceData.alive)) {
+              deviceCard.dataset.lastUpdate = Date.now();
+              deviceCard.dataset.aliveValue = deviceData.alive;
+            }
           } else {
-            // If no heartbeat data, set to 0
-            deviceCard.dataset.lastUpdate = "0";
+            // If no heartbeat data, use 0
+            if (!deviceCard.dataset.lastUpdate) {
+              deviceCard.dataset.lastUpdate = "0";
+            }
           }
   
-          // Optionally display the heartbeat value for debugging
+          // Optionally, display the heartbeat value for debugging
           if (deviceData.hasOwnProperty("alive")) {
             const alivePara = document.createElement("p");
             alivePara.textContent = "Heartbeat: " + deviceData.alive;
@@ -116,7 +122,7 @@ document.addEventListener("DOMContentLoaded", () => {
     deviceCards.forEach(card => {
       const lastUpdate = parseInt(card.dataset.lastUpdate) || 0;
       const statusDot = card.querySelector(".status-dot");
-      // If more than 6000ms have passed since last update, mark as offline; otherwise online
+      // If more than 6000ms have passed since last update, mark as offline; otherwise, online.
       if (now - lastUpdate > 6000) {
         statusDot.classList.remove("online");
         statusDot.classList.add("offline");
@@ -132,12 +138,12 @@ document.addEventListener("DOMContentLoaded", () => {
     instructionsModal.style.display = "block";
   });
   
-  // Modal: Close when close icon is clicked
+  // Modal: Close when clicking the close icon
   closeInstructions.addEventListener("click", () => {
     instructionsModal.style.display = "none";
   });
   
-  // Modal: Close if clicking outside modal content
+  // Modal: Close when clicking outside the modal content
   window.addEventListener("click", (event) => {
     if (event.target === instructionsModal) {
       instructionsModal.style.display = "none";
