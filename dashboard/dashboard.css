@@ -126,3 +126,17 @@ header {
     opacity: 0.9;
   }
   
+  /* Style for the UID copy area */
+  #userUID {
+    font-weight: bold;
+    background: #eee;
+    padding: 4px 8px;
+    border-radius: 4px;
+    margin-right: 5px;
+  }
+  #copyUIDBtn {
+    padding: 4px 8px;
+    font-size: 0.8em;
+    cursor: pointer;
+  }
+  

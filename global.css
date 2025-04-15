@@ -1,8 +1,8 @@
 /* global.css */
 :root {
     --primary-color: #333;
-    --secondary-color: #4caf50; /* Button background, accents */
-    --accent-color: #ff4f4f;    /* For Logout, errors, etc. */
+    --secondary-color: #4caf50;  /* Button background, accents */
+    --accent-color: #ff4f4f;     /* For Logout, errors, etc. */
     --background-color: #f5f5f5;
     --header-bg: #222;
     --header-text: #fff;
