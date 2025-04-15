@@ -119,7 +119,7 @@ document.addEventListener("DOMContentLoaded", () => {
         statusDot.classList.add("online");
       }
     });
-  }, 5000);
+  }, 3000);
   
   // Modal: Show when floating button is clicked
   addNodeBtn.addEventListener("click", () => {
