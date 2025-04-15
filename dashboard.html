@@ -1,11 +1,151 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>OC</title>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Dashboard - Smart Home</title>
+  <link rel="stylesheet" href="styles.css" />
+  <style>
+    /* Header styling */
+    header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      background: #333;
+      color: #fff;
+      padding: 10px 20px;
+    }
+    header h2 {
+      margin: 0;
+      font-size: 1.5em;
+    }
+    header button {
+      background: #ff4f4f;
+      border: none;
+      padding: 8px 16px;
+      cursor: pointer;
+      border-radius: 4px;
+      color: #fff;
+      font-size: 1em;
+    }
+    /* Main container */
+    .container {
+      margin: 20px auto;
+      max-width: 1000px;
+      padding: 10px;
+    }
+    /* Floating Add Node Button */
+    .floating-btn {
+      position: fixed;
+      bottom: 20px;
+      right: 20px;
+      background: #4caf50;
+      color: #fff;
+      border: none;
+      border-radius: 50%;
+      width: 60px;
+      height: 60px;
+      font-size: 2em;
+      cursor: pointer;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+    }
+    /* Modal styling for instructions */
+    .modal.instruction-modal {
+      display: none;
+      position: fixed;
+      z-index: 100;
+      left: 0;
+      top: 0;
+      width: 100%;
+      height: 100%;
+      overflow: auto;
+      background-color: rgba(0, 0, 0, 0.6);
+    }
+    .modal-content.instruction-content {
+      background-color: #fefefe;
+      margin: 15% auto;
+      padding: 20px;
+      border: 1px solid #888;
+      width: 90%;
+      max-width: 400px;
+      border-radius: 8px;
+      position: relative;
+      font-size: 1em;
+    }
+    .modal-content.instruction-content h3 {
+      margin-top: 0;
+    }
+    .modal-content.instruction-content ol {
+      padding-left: 20px;
+    }
+    .modal-content.instruction-content .close {
+      position: absolute;
+      top: 10px;
+      right: 10px;
+      font-size: 24px;
+      cursor: pointer;
+      color: #aaa;
+    }
+    .modal-content.instruction-content .close:hover {
+      color: #000;
+    }
+  </style>
 </head>
 <body>
-    <p>Hello</p>
+  <!-- Top Header with Greeting and Logout -->
+  <header>
+    <h2>Hello, <span id="displayName">User</span>!</h2>
+    <button onclick="logout()">Logout</button>
+  </header>
+  
+  <!-- Main Dashboard Content -->
+  <div class="container">
+    <!-- Here, you can load dynamic content such as device list, room details, etc. -->
+    <div id="device-list">
+      <!-- Devices or Rooms will be dynamically loaded in later steps -->
+      <p>Welcome to your Smart Home Dashboard!</p>
+    </div>
+  </div>
+  
+  <!-- Floating Add Node Button -->
+  <button class="floating-btn" id="addNodeFloatingBtn">+</button>
+  
+  <!-- Modal for Node Addition Instructions -->
+  <div id="nodeInstructionsModal" class="modal instruction-modal">
+    <div class="modal-content instruction-content">
+      <span class="close" id="closeInstructions">&times;</span>
+      <h3>How to Add a Node</h3>
+      <ol>
+        <li>Click the "+ Add Node" button.</li>
+        <li>Connect your laptop (or mobile) to the device’s AP (e.g., "TRC_IoT_Config").</li>
+        <li>Open the configuration page (e.g., http://192.168.4.1) in your browser.</li>
+        <li>Fill in the device details (SSID, password, device name, etc.).</li>
+        <li>Reconnect to your home WiFi and return to this dashboard.</li>
+        <li>Your device will appear automatically once configured.</li>
+      </ol>
+    </div>
+  </div>
+  
+  <!-- Firebase Auth and Dashboard Logic -->
+  <script type="module" src="auth.js"></script>
+  <script>
+    // Event Listener for Floating Button: Show instructions modal
+    document.getElementById("addNodeFloatingBtn").addEventListener("click", function() {
+      document.getElementById("nodeInstructionsModal").style.display = "block";
+    });
+    // Close modal when clicking on the close icon
+    document.getElementById("closeInstructions").addEventListener("click", function() {
+      document.getElementById("nodeInstructionsModal").style.display = "none";
+    });
+    // Close modal when clicking outside the modal content
+    window.onclick = function(event) {
+      const modal = document.getElementById("nodeInstructionsModal");
+      if (event.target === modal) {
+        modal.style.display = "none";
+      }
+    };
+  </script>
+  <!-- Optionally, include additional JavaScript for further dashboard functions -->
+  <script type="module" src="dashboard.js"></script>
 </body>
 </html>
