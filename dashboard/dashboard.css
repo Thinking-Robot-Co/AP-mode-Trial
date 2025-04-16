@@ -78,19 +78,28 @@ header h2 {
   color: #555;
 }
 
-/* Button styling for device actions */
-.device-card button {
+/* Switch button modifications */
+.switch-btn {
   padding: 6px 12px;
   margin: 5px 5px 0 0;
   cursor: pointer;
   border: none;
   border-radius: 4px;
-  background: var(--secondary-color);
-  color: #fff;
   font-size: 0.9em;
 }
-.device-card button.reconfigure-btn {
-  background: var(--accent-color);
+.switch-btn.on {
+  background-color: #4caf50;  /* Green when on */
+  color: #fff;
+}
+.switch-btn.off {
+  background-color: #ff4f4f;  /* Red when off */
+  color: #fff;
+}
+
+/* Button styling for other device actions */
+.device-card button:not(.switch-btn) {
+  background: var(--secondary-color);
+  color: #fff;
 }
 
 /* Floating Button styling */

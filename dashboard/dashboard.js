@@ -2,6 +2,13 @@
 import { getAuth } from "https://www.gstatic.com/firebasejs/11.6.0/firebase-auth.js";
 import { getDatabase, ref, onValue, get, child, update } from "https://www.gstatic.com/firebasejs/11.6.0/firebase-database.js";
 
+// Helper function to format seconds into "M min S sec"
+function formatTime(seconds) {
+  const m = Math.floor(seconds / 60);
+  const s = seconds % 60;
+  return m + " min " + s + " sec";
+}
+
 document.addEventListener("DOMContentLoaded", () => {
   const addNodeBtn = document.getElementById("addNodeFloatingBtn");
   const instructionsModal = document.getElementById("nodeInstructionsModal");
@@ -67,8 +74,15 @@ document.addEventListener("DOMContentLoaded", () => {
           switchContainer.appendChild(switchLabel);
   
           const switchBtn = document.createElement("button");
-          switchBtn.className = "switch-btn";
-          switchBtn.textContent = deviceData.switch ? "Turn Off" : "Turn On";
+          switchBtn.classList.add("switch-btn");
+          // Set text and color class based on the state
+          if (deviceData.switch) {
+            switchBtn.textContent = "Turn Off";
+            switchBtn.classList.add("on");
+          } else {
+            switchBtn.textContent = "Turn On";
+            switchBtn.classList.add("off");
+          }
           switchBtn.onclick = () => {
             const newState = !deviceData.switch;
             update(ref(db, "users/" + uid + "/devices/" + deviceId), { switch: newState });
@@ -114,7 +128,13 @@ document.addEventListener("DOMContentLoaded", () => {
             if (timerSelect.value === "other") {
               const customTime = prompt("Enter custom timer duration in minutes:");
               if (customTime) {
-                update(ref(db, "users/" + uid + "/devices/" + deviceId), { timerDuration: customTime });
+                // Parse custom input as integer
+                const customMinutes = parseInt(customTime);
+                if (!isNaN(customMinutes) && customMinutes > 0) {
+                  update(ref(db, "users/" + uid + "/devices/" + deviceId), { timerDuration: customMinutes });
+                } else {
+                  alert("Please enter a valid positive number for minutes.");
+                }
               }
             } else {
               update(ref(db, "users/" + uid + "/devices/" + deviceId), { timerDuration: parseInt(timerSelect.value) });
@@ -125,7 +145,13 @@ document.addEventListener("DOMContentLoaded", () => {
           // Timer feedback element (shows remaining time as updated from ESP)
           const timerFeedbackPara = document.createElement("p");
           timerFeedbackPara.className = "feedback-timer";
-          timerFeedbackPara.textContent = "Time remaining: " + (deviceData.timerFeedback ? deviceData.timerFeedback + " sec" : "N/A");
+          // Format feedback in mins and secs if available
+          if (deviceData.timerFeedback) {
+            const seconds = parseInt(deviceData.timerFeedback);
+            timerFeedbackPara.textContent = "Time remaining: " + formatTime(seconds);
+          } else {
+            timerFeedbackPara.textContent = "Time remaining: N/A";
+          }
           timerContainer.appendChild(timerFeedbackPara);
   
           deviceCard.appendChild(timerContainer);
@@ -246,7 +272,7 @@ document.addEventListener("DOMContentLoaded", () => {
     deviceCards.forEach(card => {
       const lastUpdate = parseInt(card.dataset.lastUpdate) || 0;
       const statusDot = card.querySelector(".status-dot");
-      // If more than 6000ms have passed since last update, mark as offline
+      // Mark as offline if more than 6000ms have passed
       if (now - lastUpdate > 6000) {
         statusDot.classList.remove("online");
         statusDot.classList.add("offline");
