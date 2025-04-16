@@ -20,7 +20,7 @@ document.addEventListener("DOMContentLoaded", () => {
     if (user) {
       // Update UID display
       userUIDSpan.textContent = user.uid;
-      // Fetch username
+      // Retrieve username from database
       const userProfileRef = ref(db, "users/" + user.uid + "/profile");
       get(child(userProfileRef, "username"))
         .then(snapshot => {
@@ -30,7 +30,7 @@ document.addEventListener("DOMContentLoaded", () => {
           console.error("Error fetching username:", error);
           displayNameSpan.textContent = "User";
         });
-      // Load device list for the user
+      // Load device list for the current user
       loadDeviceList(user.uid);
     }
   });
@@ -50,10 +50,10 @@ document.addEventListener("DOMContentLoaded", () => {
   
           // Status dot
           const statusDot = document.createElement("span");
-          statusDot.className = "status-dot online"; // defaults to online
+          statusDot.className = "status-dot online"; // defaults to online; will be updated via heartbeat
           deviceCard.appendChild(statusDot);
   
-          // Device name
+          // Device name element
           const nameH3 = document.createElement("h3");
           nameH3.textContent = deviceData.name || deviceId;
           deviceCard.appendChild(nameH3);
@@ -68,10 +68,8 @@ document.addEventListener("DOMContentLoaded", () => {
   
           const switchBtn = document.createElement("button");
           switchBtn.className = "switch-btn";
-          // Button text based on current state
           switchBtn.textContent = deviceData.switch ? "Turn Off" : "Turn On";
           switchBtn.onclick = () => {
-            // Toggle switch state
             const newState = !deviceData.switch;
             update(ref(db, "users/" + uid + "/devices/" + deviceId), { switch: newState });
           };
@@ -111,7 +109,6 @@ document.addEventListener("DOMContentLoaded", () => {
           optOther.value = "other";
           optOther.textContent = "Other";
           timerSelect.appendChild(optOther);
-          // Set default duration (if available; otherwise default to 1 minute)
           timerSelect.value = deviceData.timerDuration ? deviceData.timerDuration : 1;
           timerSelect.onchange = () => {
             if (timerSelect.value === "other") {
@@ -124,6 +121,13 @@ document.addEventListener("DOMContentLoaded", () => {
             }
           };
           timerContainer.appendChild(timerSelect);
+  
+          // Timer feedback element (shows remaining time as updated from ESP)
+          const timerFeedbackPara = document.createElement("p");
+          timerFeedbackPara.className = "feedback-timer";
+          timerFeedbackPara.textContent = "Time remaining: " + (deviceData.timerFeedback ? deviceData.timerFeedback + " sec" : "N/A");
+          timerContainer.appendChild(timerFeedbackPara);
+  
           deviceCard.appendChild(timerContainer);
   
           // ----- Clock/Alarm Mode Section -----
@@ -204,7 +208,7 @@ document.addEventListener("DOMContentLoaded", () => {
           };
           deviceCard.appendChild(reconfigureBtn);
   
-          // ----- Feedback (existing switch feedback) -----
+          // ----- Feedback: Display current switch feedback ---
           const feedbackPara = document.createElement("p");
           feedbackPara.className = "feedback-status";
           feedbackPara.textContent = "Feedback: " + ((deviceData.switchFeedback == 1) ? "ON" : "OFF");
@@ -242,7 +246,7 @@ document.addEventListener("DOMContentLoaded", () => {
     deviceCards.forEach(card => {
       const lastUpdate = parseInt(card.dataset.lastUpdate) || 0;
       const statusDot = card.querySelector(".status-dot");
-      // Mark as offline if more than 6000ms have passed
+      // If more than 6000ms have passed since last update, mark as offline
       if (now - lastUpdate > 6000) {
         statusDot.classList.remove("online");
         statusDot.classList.add("offline");

@@ -70,6 +70,14 @@ header h2 {
   margin-right: 3px;
 }
 
+/* Additional style for timer feedback text */
+.feedback-timer {
+  margin-top: 5px;
+  font-style: italic;
+  font-size: 0.85em;
+  color: #555;
+}
+
 /* Button styling for device actions */
 .device-card button {
   padding: 6px 12px;
