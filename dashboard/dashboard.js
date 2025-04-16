@@ -141,7 +141,6 @@ function showAddAlarmForm(alarmsContainer, uid, deviceId) {
     update(ref(getDatabase(), "users/" + uid + "/devices/" + deviceId + "/alarms/" + alarmId), alarmData)
       .then(() => {
         console.log("Alarm saved");
-        // Clear the editing flag and remove the form after saving
         globalEditingAlarm = false;
         formDiv.remove();
       })
@@ -155,7 +154,6 @@ function showAddAlarmForm(alarmsContainer, uid, deviceId) {
   cancelBtn.className = "cancel-btn";
   cancelBtn.textContent = "Cancel";
   cancelBtn.onclick = () => {
-    // Clear the editing flag and remove the form if canceled
     globalEditingAlarm = false;
     formDiv.remove();
   };
@@ -163,6 +161,35 @@ function showAddAlarmForm(alarmsContainer, uid, deviceId) {
   formDiv.appendChild(btnDiv);
   
   alarmsContainer.appendChild(formDiv);
+}
+
+// Function to show the reset confirmation modal for factory reset
+function showResetModal(uid, deviceId) {
+  const resetModal = document.getElementById("resetModal");
+  resetModal.style.display = "block";
+  
+  // When the user clicks "Yes, Reset"
+  document.getElementById("confirmResetBtn").onclick = () => {
+    update(ref(getDatabase(), "users/" + uid + "/devices/" + deviceId), { reset: 1 })
+      .then(() => {
+        alert("Reset signal sent to device.");
+        resetModal.style.display = "none";
+      })
+      .catch(err => {
+        console.error("Error sending reset:", err);
+        resetModal.style.display = "none";
+      });
+  };
+  
+  // When the user cancels
+  document.getElementById("cancelResetBtn").onclick = () => {
+    resetModal.style.display = "none";
+  };
+  
+  // Also allow closing via the close icon
+  document.getElementById("closeResetModal").onclick = () => {
+    resetModal.style.display = "none";
+  };
 }
 
 document.addEventListener("DOMContentLoaded", () => {
@@ -195,12 +222,10 @@ document.addEventListener("DOMContentLoaded", () => {
   });
   
   function loadDeviceList(uid) {
-    // If currently editing an alarm, do not re-render the device list.
     if (globalEditingAlarm) return;
     
     const devicesRef = ref(db, "users/" + uid + "/devices");
     onValue(devicesRef, snapshot => {
-      // Only re-render if not editing (to preserve any open add‑alarm forms)
       if (globalEditingAlarm) return;
       deviceListDiv.innerHTML = "";
       if (snapshot.exists()) {
@@ -333,17 +358,17 @@ document.addEventListener("DOMContentLoaded", () => {
           clockContainer.appendChild(addAlarmBtn);
           deviceCard.appendChild(clockContainer);
   
-          // ----- Reconfigure Button -----
+          // ----- Reconfigure Button (Factory Reset) -----
           const reconfigureBtn = document.createElement("button");
           reconfigureBtn.className = "reconfigure-btn";
           reconfigureBtn.textContent = "Reconfigure";
           reconfigureBtn.onclick = () => {
-            update(ref(db, "users/" + uid + "/devices/" + deviceId), { reset: 1 });
-            alert("Reset signal sent to device.");
+            // Instead of directly calling update, show the reset confirmation modal.
+            showResetModal(uid, deviceId);
           };
           deviceCard.appendChild(reconfigureBtn);
   
-          // ----- Feedback: Display current switch feedback -----
+          // ----- Feedback: Switch feedback display -----
           const feedbackPara = document.createElement("p");
           feedbackPara.className = "feedback-status";
           feedbackPara.textContent = "Feedback: " + ((deviceData.switchFeedback == 1) ? "ON" : "OFF");
