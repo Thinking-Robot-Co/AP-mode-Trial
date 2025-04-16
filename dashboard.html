@@ -11,7 +11,7 @@
   <!-- Header with greeting and Logout button -->
   <header>
     <div class="header-content">
-      <h2>Hello babe, <span id="displayName">User</span>!</h2>
+      <h2>Hello, <span id="displayName">User</span>!</h2>
     </div>
     <div class="header-actions">
       <button onclick="logout()">Logout</button>
@@ -34,7 +34,6 @@
     <div class="modal-content instruction-content">
       <span class="close" id="closeInstructions">&times;</span>
       <h3>How to Add a New Node</h3>
-      <!-- Display the user's UID with a copy button -->
       <p>
         Your UID: <span id="userUID">[Loading UID...]</span>
         <button id="copyUIDBtn" title="Copy UID">Copy</button>
@@ -48,6 +47,50 @@
         <li>Your device will then appear automatically.</li>
       </ol>
       <button id="createNewBtn" class="create-new-btn">Create New Now</button>
+    </div>
+  </div>
+  
+  <!-- Modal for Device Configuration -->
+  <div id="deviceConfigModal" class="modal instruction-modal">
+    <div class="modal-content instruction-content">
+      <span class="close" id="closeDeviceConfig">&times;</span>
+      <h3>Device Configuration</h3>
+      <form id="deviceConfigForm">
+        <input type="hidden" id="configDeviceId" />
+        <label for="modeSelect">Mode:</label>
+        <select id="modeSelect">
+          <option value="0">Basic Switch</option>
+          <option value="1">Timer Mode</option>
+          <option value="2">Alarm Mode</option>
+        </select>
+        <div id="timerConfig" style="display:none;">
+          <label for="timerDuration">Timer Duration (minutes):</label>
+          <select id="timerDuration">
+            <option value="1">1 min</option>
+            <option value="2">2 min</option>
+            <option value="5">5 min</option>
+            <option value="10">10 min</option>
+            <option value="15">15 min</option>
+            <option value="30">30 min</option>
+            <option value="custom">Other</option>
+          </select>
+          <input id="customTimerDuration" type="number" placeholder="Enter minutes" style="display:none;">
+        </div>
+        <div id="alarmConfig" style="display:none;">
+          <label for="alarmOnTime">On Time:</label>
+          <input type="time" id="alarmOnTime">
+          <label for="alarmOffTime">Off Time:</label>
+          <input type="time" id="alarmOffTime">
+          <label for="alarmRepeat">Repeat:</label>
+          <select id="alarmRepeat">
+            <option value="daily">Daily</option>
+            <option value="weekly">Weekly</option>
+            <option value="monthly">Monthly</option>
+            <option value="custom">Custom</option>
+          </select>
+        </div>
+        <button type="button" id="saveConfigBtn">Save Configuration</button>
+      </form>
     </div>
   </div>
   
