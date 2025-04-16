@@ -2,86 +2,92 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Smart Home - Login/Signup</title>
-  <link rel="stylesheet" href="styles.css" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Dashboard - Smart Home</title>
+  <link rel="stylesheet" href="global.css" />
+  <link rel="stylesheet" href="dashboard/dashboard.css" />
 </head>
 <body>
-  <div class="container">
-    <div class="tabs">
-      <button id="loginTab" class="active">Login</button>
-      <button id="signupTab">Sign Up</button>
+  <!-- Header with greeting and Logout button -->
+  <header>
+    <div class="header-content">
+      <h2>Hello babe, <span id="displayName">User</span>!</h2>
     </div>
-    
-    <div class="form-container">
-      <!-- Login Form -->
-      <form id="loginForm">
-        <h2>Login</h2>
-        <div id="loginMessage" class="message"></div>
-        <input type="email" id="loginEmail" placeholder="Email" required />
-        <div class="input-group">
-          <input type="password" id="loginPassword" placeholder="Password" required />
-          <span class="toggle-pwd" onclick="togglePassword('loginPassword', this)">👁️</span>
+    <div class="header-actions">
+      <button onclick="logout()">Logout</button>
+    </div>
+  </header>
+  
+  <!-- Main container for devices -->
+  <div class="container">
+    <div id="device-list">
+      <!-- Device cards will be loaded dynamically here -->
+      <p>Loading devices...</p>
+    </div>
+  </div>
+  
+  <!-- Floating Add Node Button -->
+  <button class="floating-btn" id="addNodeFloatingBtn">+</button>
+  
+  <!-- Modal for Node Addition Instructions -->
+  <div id="nodeInstructionsModal" class="modal instruction-modal">
+    <div class="modal-content instruction-content">
+      <span class="close" id="closeInstructions">&times;</span>
+      <h3>How to Add a New Node</h3>
+      <p>
+        Your UID: <span id="userUID">[Loading UID...]</span>
+        <button id="copyUIDBtn" title="Copy UID">Copy</button>
+      </p>
+      <ol>
+        <li>Click the "+ Add Node" button.</li>
+        <li>Connect to the device's WiFi (e.g., "TRC_IoT_Config").</li>
+        <li>Open the provisioning page at <code>http://192.168.4.1</code> in your browser.</li>
+        <li>Fill in the device details (SSID, WiFi password, Device Name) and paste your UID into the form.</li>
+        <li>Reconnect to your home WiFi and return to this dashboard.</li>
+        <li>Your device will then appear automatically.</li>
+      </ol>
+      <button id="createNewBtn" class="create-new-btn">Create New Now</button>
+    </div>
+  </div>
+  
+  <!-- Modal for Adding a New Alarm -->
+  <div id="alarmModal" class="modal">
+    <div class="modal-content">
+      <span class="close" id="closeAlarmModal">&times;</span>
+      <h3>Add Auto On Clock Alarm</h3>
+      <form id="alarmForm">
+        <label for="alarmOnTime">On Time:</label>
+        <input type="time" id="alarmOnTime" required><br><br>
+        
+        <label for="alarmOffTime">Off Time:</label>
+        <input type="time" id="alarmOffTime" required><br><br>
+        
+        <label for="alarmRepeat">Repeat:</label>
+        <select id="alarmRepeat">
+          <option value="None">No Repeat</option>
+          <option value="EveryDay">Every Day</option>
+          <option value="Custom">Custom</option>
+        </select><br><br>
+        
+        <div id="customDays" style="display:none;">
+          <label>Select Days:</label><br>
+          <input type="checkbox" value="Mon" id="dayMon"> <label for="dayMon">Mon</label>
+          <input type="checkbox" value="Tue" id="dayTue"> <label for="dayTue">Tue</label>
+          <input type="checkbox" value="Wed" id="dayWed"> <label for="dayWed">Wed</label>
+          <input type="checkbox" value="Thu" id="dayThu"> <label for="dayThu">Thu</label>
+          <input type="checkbox" value="Fri" id="dayFri"> <label for="dayFri">Fri</label>
+          <input type="checkbox" value="Sat" id="daySat"> <label for="daySat">Sat</label>
+          <input type="checkbox" value="Sun" id="daySun"> <label for="daySun">Sun</label><br>
         </div>
-        <div class="remember-me">
-          <input type="checkbox" id="rememberMe" />
-          <label for="rememberMe">Remember Me</label>
-        </div>
-        <button type="button" onclick="login()">Login</button>
-      </form>
-      
-      <!-- Signup Form -->
-      <form id="signupForm" style="display: none;">
-        <h2>Sign Up</h2>
-        <div id="signupMessage" class="message"></div>
-        <input type="text" id="signupUsername" placeholder="Username" required />
-        <input type="email" id="signupEmail" placeholder="Email" required />
-        <div class="input-group">
-          <input type="password" id="signupPassword" placeholder="Password" required />
-          <span class="toggle-pwd" onclick="togglePassword('signupPassword', this)">👁️</span>
-        </div>
-        <button type="button" onclick="signUp()">Sign Up</button>
+        
+        <button type="submit" class="create-new-btn">Save Alarm</button>
       </form>
     </div>
   </div>
   
-  <!-- Load Firebase Auth logic -->
+  <!-- Firebase Auth and Global Logic -->
   <script type="module" src="auth.js"></script>
-  
-  <!-- Tab switcher and password toggle -->
-  <script>
-    document.addEventListener("DOMContentLoaded", function () {
-      const loginTab = document.getElementById("loginTab");
-      const signupTab = document.getElementById("signupTab");
-      const loginForm = document.getElementById("loginForm");
-      const signupForm = document.getElementById("signupForm");
-      
-      loginTab.addEventListener("click", () => {
-        loginTab.classList.add("active");
-        signupTab.classList.remove("active");
-        loginForm.style.display = "block";
-        signupForm.style.display = "none";
-      });
-      
-      signupTab.addEventListener("click", () => {
-        signupTab.classList.add("active");
-        loginTab.classList.remove("active");
-        signupForm.style.display = "block";
-        loginForm.style.display = "none";
-      });
-    });
-    
-    // Function to toggle password visibility
-    function togglePassword(fieldId, toggleElem) {
-      const pwdField = document.getElementById(fieldId);
-      if (pwdField.type === "password") {
-        pwdField.type = "text";
-        toggleElem.style.color = "blue";
-      } else {
-        pwdField.type = "password";
-        toggleElem.style.color = "";
-      }
-    }
-  </script>
+  <!-- Dashboard-specific JavaScript -->
+  <script type="module" src="dashboard/dashboard.js"></script>
 </body>
 </html>

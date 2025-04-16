@@ -4,6 +4,11 @@
 #include <FirebaseESP8266.h>
 #include <addons/TokenHelper.h>  // For tokenStatusCallback
 
+// ---- New includes for clock mode ----
+#include <WiFiUdp.h>
+#include <NTPClient.h>
+#include <ArduinoJson.h>
+
 // -------------------------
 // Definitions and Constants
 // -------------------------
@@ -42,10 +47,15 @@ bool credentialsExist = false;
 String devicePath = "";
 int localSwitchState = 0;
 
-// Timer-related globals
+// Timer-related globals (previous timer mode)
 bool timerActive = false;
 unsigned long timerStartMillis = 0;
 unsigned long timerDurationMillis = 0;   // in milliseconds
+
+// ---- Clock Mode globals ----
+WiFiUDP ntpUDP;
+NTPClient ntpClient(ntpUDP, "pool.ntp.org", 0, 60000);  // adjust timezone offset as needed
+static unsigned long lastAlarmCheckMillis = 0;
 
 // -------------------------
 // Button Debounce Variables
@@ -217,38 +227,20 @@ void setupSTAMode() {
     delay(2000);
     
     // Initialize device node with default values
-    if (Firebase.setInt(fbdo, devicePath + "/switch", 0)) {
-      Serial.println("Default switch state set to 0.");
-      localSwitchState = 0;
-    } else {
-      Serial.println("Failed to set default switch state: " + fbdo.errorReason());
-    }
-    if (Firebase.setInt(fbdo, devicePath + "/reset", 0)) {
-      Serial.println("Default reset state set to 0.");
-    } else {
-      Serial.println("Failed to set default reset state: " + fbdo.errorReason());
-    }
-    if (Firebase.setInt(fbdo, devicePath + "/switchFeedback", 0)) {
-      Serial.println("Default switchFeedback set to 0.");
-    } else {
-      Serial.println("Failed to set default switchFeedback: " + fbdo.errorReason());
-    }
-    // Initialize Timer defaults
-    if (Firebase.setInt(fbdo, devicePath + "/timer", 0)) {
-      Serial.println("Default timer flag set to 0.");
-    } else {
-      Serial.println("Failed to set default timer flag: " + fbdo.errorReason());
-    }
-    if (Firebase.setInt(fbdo, devicePath + "/timerDuration", 1)) {
-      Serial.println("Default timer duration set to 1 minute.");
-    } else {
-      Serial.println("Failed to set default timer duration: " + fbdo.errorReason());
-    }
-    if (Firebase.setInt(fbdo, devicePath + "/timerFeedback", 0)) {
-      Serial.println("Default timer feedback set to 0.");
-    } else {
-      Serial.println("Failed to set default timer feedback: " + fbdo.errorReason());
-    }
+    Firebase.setInt(fbdo, devicePath + "/switch", 0);
+    localSwitchState = 0;
+    Firebase.setInt(fbdo, devicePath + "/reset", 0);
+    Firebase.setInt(fbdo, devicePath + "/switchFeedback", 0);
+    // Timer defaults
+    Firebase.setInt(fbdo, devicePath + "/timer", 0);
+    Firebase.setInt(fbdo, devicePath + "/timerDuration", 1);  // in minutes
+    Firebase.setInt(fbdo, devicePath + "/timerFeedback", 0);
+    // Clock mode flag (alarm)
+    Firebase.setInt(fbdo, devicePath + "/clock", 0);
+    // Initialize alarms node (if not present, can be empty)
+    
+    // Initialize NTP client
+    ntpClient.begin();
     
   } else {
     Serial.println("Failed to connect to WiFi. Restarting in AP mode.");
@@ -271,6 +263,83 @@ void factoryReset() {
   EEPROM.write(FLAG_ADDR, 0x00);
   EEPROM.commit();
   ESP.restart();
+}
+
+// -------------------------
+// Function to check and process scheduled alarms (clock mode)
+// -------------------------
+void checkAlarms() {
+  // Update NTP client
+  ntpClient.update();
+  unsigned long epochTime = ntpClient.getEpochTime();
+  time_t rawTime = epochTime;
+  struct tm * timeInfo = localtime(&rawTime);
+  char currentTime[6]; // Format "HH:MM"
+  sprintf(currentTime, "%02d:%02d", timeInfo->tm_hour, timeInfo->tm_min);
+  
+  const char* daysOfWeek[7] = {"Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"};
+  String currentDay = daysOfWeek[timeInfo->tm_wday];
+  
+  // Get alarms JSON from Firebase (alarms stored under devicePath + "/alarms")
+  if (Firebase.getJSON(fbdo, devicePath + "/alarms")) {
+    String jsonStr = fbdo.jsonData();
+    const size_t capacity = JSON_OBJECT_SIZE(5) * 5; // estimated capacity for up to 5 alarms
+    DynamicJsonDocument doc(capacity);
+    DeserializationError error = deserializeJson(doc, jsonStr);
+    if (!error) {
+      for (JsonPair kv : doc.as<JsonObject>()) {
+        String alarmID = kv.key().c_str();
+        JsonObject alarmObj = kv.value().as<JsonObject>();
+        String onTime = alarmObj["onTime"] | "";
+        String offTime = alarmObj["offTime"] | "";
+        String repeat = alarmObj["repeat"] | "None";  // "None", "EveryDay", or a comma-separated string of days
+        
+        bool repeatCondition = false;
+        if (repeat == "None") {
+          repeatCondition = true;  // For one-time alarms, assume trigger once per occurrence
+        } else if (repeat == "EveryDay") {
+          repeatCondition = true;
+        } else {
+          // Custom repeat: check if currentDay is in the comma-separated list
+          if (repeat.indexOf(currentDay) != -1) {
+            repeatCondition = true;
+          }
+        }
+        
+        // If repeat condition holds, compare current time with alarm times.
+        // (A one-minute window is assumed so that if the current HH:MM matches exactly, we trigger.)
+        if (repeatCondition && onTime != "" && strcmp(currentTime, onTime.c_str()) == 0) {
+          if (localSwitchState == 0) {
+            localSwitchState = 1;
+            digitalWrite(SSR_PIN, HIGH);
+            Firebase.setInt(fbdo, devicePath + "/switch", 1);
+            Firebase.setInt(fbdo, devicePath + "/switchFeedback", 1);
+            Serial.print("Alarm (");
+            Serial.print(alarmID);
+            Serial.print(") triggered: Switch turned ON at ");
+            Serial.println(currentTime);
+          }
+        }
+        if (repeatCondition && offTime != "" && strcmp(currentTime, offTime.c_str()) == 0) {
+          if (localSwitchState == 1) {
+            localSwitchState = 0;
+            digitalWrite(SSR_PIN, LOW);
+            Firebase.setInt(fbdo, devicePath + "/switch", 0);
+            Firebase.setInt(fbdo, devicePath + "/switchFeedback", 0);
+            Serial.print("Alarm (");
+            Serial.print(alarmID);
+            Serial.print(") triggered: Switch turned OFF at ");
+            Serial.println(currentTime);
+          }
+        }
+      }
+    } else {
+      Serial.print("Error parsing alarms JSON: ");
+      Serial.println(error.c_str());
+    }
+  } else {
+    Serial.println("Failed to get alarms JSON: " + fbdo.errorReason());
+  }
 }
 
 // -------------------------
@@ -299,7 +368,7 @@ void setup() {
 }
 
 // -------------------------
-// Loop: Monitor button, poll Firebase, update heartbeat, and update switch & timer feedback
+// Loop: Monitor button, poll Firebase, update heartbeat, timer & clock mode processing
 // -------------------------
 void loop() {
   if (!credentialsExist) {
@@ -317,17 +386,13 @@ void loop() {
         if (Firebase.setInt(fbdo, devicePath + "/switch", localSwitchState)) {
           Serial.print("Toggle switch event detected. New switch state: ");
           Serial.println(localSwitchState);
-          // Update switchFeedback as well
           if (Firebase.setInt(fbdo, devicePath + "/switchFeedback", localSwitchState)) {
             Serial.print("Switch feedback updated to: ");
             Serial.println(localSwitchState);
-          } else {
-            Serial.print("Failed to update switch feedback: ");
-            Serial.println(fbdo.errorReason());
           }
           digitalWrite(SSR_PIN, (localSwitchState == 1 ? HIGH : LOW));
           // If switch turned off manually, cancel any running timer
-          if(localSwitchState == 0 && timerActive) {
+          if (localSwitchState == 0 && timerActive) {
             timerActive = false;
             Firebase.setInt(fbdo, devicePath + "/timerFeedback", 0);
             Serial.println("Switch turned off manually, timer canceled.");
@@ -340,7 +405,7 @@ void loop() {
     }
     lastButtonReading = currentReading;
   
-    // --- Firebase Polling Section ---
+    // --- Firebase Polling Section for switch & timer ---
     if (Firebase.ready()) {
       // Poll for external switch update
       if (Firebase.getInt(fbdo, devicePath + "/switch")) {
@@ -350,16 +415,8 @@ void loop() {
           Serial.print("Firebase switch state updated to: ");
           Serial.println(localSwitchState);
           digitalWrite(SSR_PIN, (localSwitchState == 1 ? HIGH : LOW));
-          if (Firebase.setInt(fbdo, devicePath + "/switchFeedback", localSwitchState)) {
-            Serial.print("Switch feedback updated to: ");
-            Serial.println(localSwitchState);
-          } else {
-            Serial.print("Failed to update switch feedback: ");
-            Serial.println(fbdo.errorReason());
-          }
+          Firebase.setInt(fbdo, devicePath + "/switchFeedback", localSwitchState);
         }
-      } else {
-        Serial.println("Failed to get switch value: " + fbdo.errorReason());
       }
       
       // Poll for reset command
@@ -370,15 +427,12 @@ void loop() {
         if (resetState == 1) {
           factoryReset();
         }
-      } else {
-        Serial.println("Failed to get reset value: " + fbdo.errorReason());
       }
       
       // --- Timer Mode Section ---
       if (Firebase.getInt(fbdo, devicePath + "/timer")) {
         int firebaseTimerFlag = fbdo.intData();
         if (firebaseTimerFlag == 1 && localSwitchState == 1) {
-          // Read timer duration (in minutes)
           if (Firebase.getInt(fbdo, devicePath + "/timerDuration")) {
             int timerMinutes = fbdo.intData();
             if (!timerActive) {
@@ -393,7 +447,6 @@ void loop() {
             Serial.println("Failed to get timerDuration: " + fbdo.errorReason());
           }
         } else {
-          // Either timer flag is disabled or switch is off so cancel timer if running
           if (timerActive) {
             timerActive = false;
             Firebase.setInt(fbdo, devicePath + "/timerFeedback", 0);
@@ -401,47 +454,44 @@ void loop() {
           }
         }
       
-        // Update timer feedback if timer is running
         if (timerActive) {
           unsigned long elapsed = millis() - timerStartMillis;
           if (elapsed >= timerDurationMillis) {
-            // Timer expired: turn off switch and reset timer
             localSwitchState = 0;
             digitalWrite(SSR_PIN, LOW);
-            if (Firebase.setInt(fbdo, devicePath + "/switch", 0)) {
-              Serial.println("Timer expired: Switch turned off.");
-            } else {
-              Serial.println("Failed to update switch after timer expiry: " + fbdo.errorReason());
-            }
+            Firebase.setInt(fbdo, devicePath + "/switch", 0);
             Firebase.setInt(fbdo, devicePath + "/switchFeedback", 0);
             timerActive = false;
             Firebase.setInt(fbdo, devicePath + "/timerFeedback", 0);
+            Serial.println("Timer expired: Switch turned off.");
           } else {
             unsigned long remaining = timerDurationMillis - elapsed;
             int remainingSeconds = remaining / 1000;
-            if (Firebase.setInt(fbdo, devicePath + "/timerFeedback", remainingSeconds)) {
-              Serial.print("Timer feedback updated: ");
-              Serial.println(remainingSeconds);
-            } else {
-              Serial.println("Failed to update timerFeedback: " + fbdo.errorReason());
-            }
+            Firebase.setInt(fbdo, devicePath + "/timerFeedback", remainingSeconds);
+            Serial.print("Timer feedback updated: ");
+            Serial.println(remainingSeconds);
           }
         }
-      } else {
-        Serial.println("Failed to get timer flag: " + fbdo.errorReason());
+      }
+      
+      // --- Clock/Alarm Mode Section ---
+      if (Firebase.getInt(fbdo, devicePath + "/clock")) {
+        int clockFlag = fbdo.intData();
+        if (clockFlag == 1) {
+          if (millis() - lastAlarmCheckMillis > 10000) {  // check alarms every 10 seconds
+            lastAlarmCheckMillis = millis();
+            checkAlarms();
+          }
+        }
       }
       
       // --- Heartbeat (Alive) Update Section ---
       if (Firebase.ready() && (millis() - lastHeartbeatSent > 3000)) {
         lastHeartbeatSent = millis();
-        int heartbeat = random(1000, 10000);  // Generate a random 4-digit number
-        if (Firebase.setInt(fbdo, devicePath + "/alive", heartbeat)) {
-          Serial.print("Heartbeat updated: ");
-          Serial.println(heartbeat);
-        } else {
-          Serial.print("Failed to update heartbeat: ");
-          Serial.println(fbdo.errorReason());
-        }
+        int heartbeat = random(1000, 10000);
+        Firebase.setInt(fbdo, devicePath + "/alive", heartbeat);
+        Serial.print("Heartbeat updated: ");
+        Serial.println(heartbeat);
       }
     }
     delay(500);

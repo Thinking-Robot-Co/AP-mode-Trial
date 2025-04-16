@@ -118,11 +118,11 @@ header h2 {
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
 }
 
-/* Modal styling for instructions */
-.modal.instruction-modal {
+/* Modal styling for node instructions and alarm addition */
+.modal {
   display: none;
   position: fixed;
-  z-index: 100;
+  z-index: 200;
   left: 0;
   top: 0;
   width: 100%;
@@ -130,7 +130,8 @@ header h2 {
   background-color: var(--modal-bg);
   overflow: auto;
 }
-.modal-content.instruction-content {
+
+.modal-content {
   background-color: var(--modal-content-bg);
   margin: 10% auto;
   padding: 20px;
@@ -140,13 +141,12 @@ header h2 {
   border-radius: 8px;
   position: relative;
 }
-.modal-content.instruction-content h3 {
+
+.modal-content h3 {
   margin-top: 0;
 }
-.modal-content.instruction-content ol {
-  padding-left: 20px;
-}
-.modal-content.instruction-content .close {
+
+.modal-content .close {
   position: absolute;
   top: 10px;
   right: 10px;
@@ -155,9 +155,11 @@ header h2 {
   cursor: pointer;
   color: #aaa;
 }
-.modal-content.instruction-content .close:hover {
+
+.modal-content .close:hover {
   color: #000;
 }
+
 .create-new-btn {
   display: block;
   width: 100%;
@@ -170,6 +172,7 @@ header h2 {
   font-size: 1em;
   cursor: pointer;
 }
+
 .create-new-btn:hover {
   opacity: 0.9;
 }
