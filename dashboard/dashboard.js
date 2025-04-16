@@ -1,12 +1,156 @@
 // dashboard/dashboard.js
 import { getAuth } from "https://www.gstatic.com/firebasejs/11.6.0/firebase-auth.js";
-import { getDatabase, ref, onValue, get, child, update, push, remove } from "https://www.gstatic.com/firebasejs/11.6.0/firebase-database.js";
+import { getDatabase, ref, onValue, get, child, update, remove, push } from "https://www.gstatic.com/firebasejs/11.6.0/firebase-database.js";
 
 // Helper function to format seconds into "M min S sec"
 function formatTime(seconds) {
   const m = Math.floor(seconds / 60);
   const s = seconds % 60;
   return m + " min " + s + " sec";
+}
+
+// Render a single alarm entry
+function renderAlarmEntry(alarmObj, alarmId, uid, deviceId) {
+  const entryDiv = document.createElement("div");
+  entryDiv.className = "alarm-entry";
+  
+  // Build description text from alarm properties
+  const desc = document.createElement("span");
+  let text = "On: " + (alarmObj.onTime || "N/A") +
+             " | Off: " + (alarmObj.offTime || "N/A") +
+             " | Repeat: " + (alarmObj.repeat || "none");
+  if (alarmObj.repeat === "custom" && alarmObj.days) {
+    let daysArr = [];
+    for (const day in alarmObj.days) {
+      if (alarmObj.days[day]) daysArr.push(day);
+    }
+    text += " (" + daysArr.join(", ") + ")";
+  }
+  desc.textContent = text;
+  entryDiv.appendChild(desc);
+  
+  // Delete button for the alarm
+  const delBtn = document.createElement("button");
+  delBtn.textContent = "Delete";
+  delBtn.onclick = () => {
+    remove(ref(getDatabase(), "users/" + uid + "/devices/" + deviceId + "/alarms/" + alarmId))
+      .then(() => console.log("Alarm deleted"))
+      .catch(err => console.error("Delete error:", err));
+  };
+  entryDiv.appendChild(delBtn);
+  
+  return entryDiv;
+}
+
+// Show an inline form to add a new alarm; on submit update Firebase
+function showAddAlarmForm(alarmsContainer, uid, deviceId) {
+  // Create a form div
+  const formDiv = document.createElement("div");
+  formDiv.className = "add-alarm-form";
+  
+  // On time input
+  const onTimeLabel = document.createElement("label");
+  onTimeLabel.textContent = "On Time:";
+  formDiv.appendChild(onTimeLabel);
+  const onTimeInput = document.createElement("input");
+  onTimeInput.type = "time";
+  onTimeInput.required = true;
+  formDiv.appendChild(onTimeInput);
+  
+  // Off time input
+  const offTimeLabel = document.createElement("label");
+  offTimeLabel.textContent = " Off Time:";
+  formDiv.appendChild(offTimeLabel);
+  const offTimeInput = document.createElement("input");
+  offTimeInput.type = "time";
+  offTimeInput.required = true;
+  formDiv.appendChild(offTimeInput);
+  
+  // Repeat select
+  const repeatLabel = document.createElement("label");
+  repeatLabel.textContent = " Repeat:";
+  formDiv.appendChild(repeatLabel);
+  const repeatSelect = document.createElement("select");
+  const options = [
+    { value: "none", text: "No Repeat" },
+    { value: "daily", text: "Every Day" },
+    { value: "custom", text: "Custom" }
+  ];
+  options.forEach(optData => {
+    const opt = document.createElement("option");
+    opt.value = optData.value;
+    opt.textContent = optData.text;
+    repeatSelect.appendChild(opt);
+  });
+  formDiv.appendChild(repeatSelect);
+  
+  // Div for custom day checkboxes (hidden unless "custom" selected)
+  const daysDiv = document.createElement("div");
+  daysDiv.className = "alarm-days";
+  daysDiv.style.display = "none"; // hidden initially
+  const dayNames = ["sun", "mon", "tue", "wed", "thu", "fri", "sat"];
+  dayNames.forEach(day => {
+    const checkbox = document.createElement("input");
+    checkbox.type = "checkbox";
+    checkbox.id = "day_" + day;
+    checkbox.value = day;
+    const label = document.createElement("label");
+    label.setAttribute("for", "day_" + day);
+    label.textContent = day;
+    daysDiv.appendChild(checkbox);
+    daysDiv.appendChild(label);
+  });
+  formDiv.appendChild(daysDiv);
+  
+  // Show/hide custom days based on repeat select
+  repeatSelect.onchange = () => {
+    daysDiv.style.display = (repeatSelect.value === "custom") ? "block" : "none";
+  };
+  
+  // Form buttons: Save and Cancel
+  const btnDiv = document.createElement("div");
+  btnDiv.className = "alarm-form-buttons";
+  const saveBtn = document.createElement("button");
+  saveBtn.className = "save-btn";
+  saveBtn.textContent = "Save";
+  saveBtn.onclick = () => {
+    const onTime = onTimeInput.value;
+    const offTime = offTimeInput.value;
+    const repeat = repeatSelect.value;
+    let alarmData = {
+      onTime: onTime,
+      offTime: offTime,
+      repeat: repeat
+    };
+    if (repeat === "custom") {
+      let days = {};
+      dayNames.forEach(day => {
+        const cb = daysDiv.querySelector('#day_' + day);
+        days[day] = cb.checked;
+      });
+      alarmData.days = days;
+    }
+    // Use current timestamp as key for new alarm
+    const alarmId = Date.now().toString();
+    update(ref(getDatabase(), "users/" + uid + "/devices/" + deviceId + "/alarms/" + alarmId), alarmData)
+      .then(() => {
+        console.log("Alarm saved");
+        // Remove form after saving
+        formDiv.remove();
+      })
+      .catch(err => console.error("Error saving alarm:", err));
+  };
+  btnDiv.appendChild(saveBtn);
+  const cancelBtn = document.createElement("button");
+  cancelBtn.className = "cancel-btn";
+  cancelBtn.textContent = "Cancel";
+  cancelBtn.onclick = () => {
+    formDiv.remove();
+  };
+  btnDiv.appendChild(cancelBtn);
+  formDiv.appendChild(btnDiv);
+  
+  alarmsContainer.appendChild(formDiv);
 }
 
 document.addEventListener("DOMContentLoaded", () => {
@@ -18,17 +162,10 @@ document.addEventListener("DOMContentLoaded", () => {
   const userUIDSpan = document.getElementById("userUID");
   const displayNameSpan = document.getElementById("displayName");
   const deviceListDiv = document.getElementById("device-list");
-  
-  // Alarm Modal Elements
-  const alarmModal = document.getElementById("alarmModal");
-  const closeAlarmModal = document.getElementById("closeAlarmModal");
-  const alarmForm = document.getElementById("alarmForm");
-  let currentDeviceIdForAlarm = null; // To remember which device card triggered alarm addition
 
   const auth = getAuth();
   const db = getDatabase();
 
-  // Listen for auth state changes to update UID, username, and load devices
   auth.onAuthStateChanged(user => {
     if (user) {
       userUIDSpan.textContent = user.uid;
@@ -45,7 +182,6 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   });
   
-  // Function to load device list and build device cards
   function loadDeviceList(uid) {
     const devicesRef = ref(db, "users/" + uid + "/devices");
     onValue(devicesRef, snapshot => {
@@ -53,17 +189,14 @@ document.addEventListener("DOMContentLoaded", () => {
       if (snapshot.exists()) {
         const devices = snapshot.val();
         Object.entries(devices).forEach(([deviceId, deviceData]) => {
-          // Create device card container
           const deviceCard = document.createElement("div");
           deviceCard.className = "device-card";
           deviceCard.id = "device-" + deviceId;
   
-          // Status dot
           const statusDot = document.createElement("span");
           statusDot.className = "status-dot online";
           deviceCard.appendChild(statusDot);
   
-          // Device name
           const nameH3 = document.createElement("h3");
           nameH3.textContent = deviceData.name || deviceId;
           deviceCard.appendChild(nameH3);
@@ -74,7 +207,6 @@ document.addEventListener("DOMContentLoaded", () => {
           const switchLabel = document.createElement("label");
           switchLabel.textContent = "Switch Mode:";
           switchContainer.appendChild(switchLabel);
-  
           const switchBtn = document.createElement("button");
           switchBtn.classList.add("switch-btn");
           if (deviceData.switch) {
@@ -165,48 +297,21 @@ document.addEventListener("DOMContentLoaded", () => {
           clockLabel.textContent = " Clock/Alarm Mode";
           clockContainer.appendChild(clockLabel);
   
-          // Container for listing alarms
-          const alarmsListDiv = document.createElement("div");
-          alarmsListDiv.id = "alarmsList-" + deviceId;
-          alarmsListDiv.style.marginTop = "5px";
-          // Fetch and display alarms for this device
-          const alarmsRef = ref(db, "users/" + uid + "/devices/" + deviceId + "/alarms");
-          onValue(alarmsRef, snapshot => {
-            alarmsListDiv.innerHTML = "";
-            if (snapshot.exists()) {
-              const alarms = snapshot.val();
-              Object.entries(alarms).forEach(([alarmId, alarmData]) => {
-                const alarmDiv = document.createElement("div");
-                alarmDiv.style.borderTop = "1px dashed #ccc";
-                alarmDiv.style.marginTop = "5px";
-                alarmDiv.style.paddingTop = "3px";
-                alarmDiv.textContent = "On: " + (alarmData.onTime || "") + " | Off: " + (alarmData.offTime || "") + " | Repeat: " + (alarmData.repeat || "None");
-                // Delete button
-                const delBtn = document.createElement("button");
-                delBtn.textContent = "Delete";
-                delBtn.style.fontSize = "0.8em";
-                delBtn.style.marginLeft = "5px";
-                delBtn.onclick = () => {
-                  if (confirm("Delete this alarm?")) {
-                    remove(ref(db, "users/" + uid + "/devices/" + deviceId + "/alarms/" + alarmId));
-                  }
-                };
-                alarmDiv.appendChild(delBtn);
-                alarmsListDiv.appendChild(alarmDiv);
-              });
-            } else {
-              alarmsListDiv.innerHTML = "<em>No alarms scheduled.</em>";
+          // Create alarms container and add-alarm button
+          const alarmsContainer = document.createElement("div");
+          alarmsContainer.className = "alarms-container";
+          if (deviceData.alarms) {
+            for (const key in deviceData.alarms) {
+              const alarmEntry = renderAlarmEntry(deviceData.alarms[key], key, uid, deviceId);
+              alarmsContainer.appendChild(alarmEntry);
             }
-          });
-          clockContainer.appendChild(alarmsListDiv);
-  
-          // "Add Auto On Clock" button
+          }
+          clockContainer.appendChild(alarmsContainer);
           const addAlarmBtn = document.createElement("button");
+          addAlarmBtn.className = "add-alarm-btn";
           addAlarmBtn.textContent = "Add Auto On Clock";
-          addAlarmBtn.style.marginTop = "5px";
           addAlarmBtn.onclick = () => {
-            currentDeviceIdForAlarm = deviceId;
-            alarmModal.style.display = "block";
+            showAddAlarmForm(alarmsContainer, uid, deviceId);
           };
           clockContainer.appendChild(addAlarmBtn);
           deviceCard.appendChild(clockContainer);
@@ -221,7 +326,7 @@ document.addEventListener("DOMContentLoaded", () => {
           };
           deviceCard.appendChild(reconfigureBtn);
   
-          // ----- Feedback: Switch feedback -----
+          // ----- Feedback: Switch feedback display -----
           const feedbackPara = document.createElement("p");
           feedbackPara.className = "feedback-status";
           feedbackPara.textContent = "Feedback: " + ((deviceData.switchFeedback == 1) ? "ON" : "OFF");
@@ -252,7 +357,7 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   }
   
-  // Interval to check heartbeat status every 2 seconds
+  // Heartbeat interval
   setInterval(() => {
     const deviceCards = document.querySelectorAll(".device-card");
     const now = Date.now();
@@ -269,19 +374,16 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   }, 2000);
   
-  // Modal events for node instructions
+  // Modal events
   addNodeBtn.addEventListener("click", () => {
     instructionsModal.style.display = "block";
   });
   closeInstructions.addEventListener("click", () => {
     instructionsModal.style.display = "none";
   });
-  window.addEventListener("click", event => {
+  window.addEventListener("click", (event) => {
     if (event.target === instructionsModal) {
       instructionsModal.style.display = "none";
-    }
-    if (event.target === alarmModal) {
-      alarmModal.style.display = "none";
     }
   });
   createNewBtn.addEventListener("click", () => {
@@ -296,63 +398,10 @@ document.addEventListener("DOMContentLoaded", () => {
           copyUIDBtn.textContent = "Copy";
         }, 2000);
       })
-      .catch(err => {
+      .catch((err) => {
         console.error("Failed to copy UID:", err);
       });
-  
-    console.log("Dashboard JS loaded and ready.");
   });
   
-  // Handle Alarm Modal close
-  closeAlarmModal.addEventListener("click", () => {
-    alarmModal.style.display = "none";
-  });
-  
-  // Handle Alarm Form submission
-  alarmForm.addEventListener("submit", event => {
-    event.preventDefault();
-    const onTime = document.getElementById("alarmOnTime").value;
-    const offTime = document.getElementById("alarmOffTime").value;
-    const repeatVal = document.getElementById("alarmRepeat").value;
-    let repeatStr = repeatVal;
-    if (repeatVal === "Custom") {
-      // Collect checked days
-      const days = [];
-      ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"].forEach(day => {
-        if (document.getElementById("day" + day).checked) {
-          days.push(day);
-        }
-      });
-      repeatStr = days.join(",");
-      if (repeatStr === "") {
-        alert("Please select at least one day for custom repeat.");
-        return;
-      }
-    }
-    // Build alarm object
-    const alarmData = {
-      onTime: onTime,
-      offTime: offTime,
-      repeat: repeatStr
-    };
-    // Push alarm to Firebase under the device's alarms node
-    const alarmsRef = ref(db, "users/" + userUIDSpan.textContent + "/devices/" + currentDeviceIdForAlarm + "/alarms");
-    push(alarmsRef, alarmData)
-      .then(() => {
-        alert("Alarm added successfully.");
-        alarmModal.style.display = "none";
-      })
-      .catch(error => {
-        alert("Error adding alarm: " + error.message);
-      });
-  });
-  
-  // Show/hide custom days based on repeat selection
-  document.getElementById("alarmRepeat").addEventListener("change", function() {
-    if (this.value === "Custom") {
-      document.getElementById("customDays").style.display = "block";
-    } else {
-      document.getElementById("customDays").style.display = "none";
-    }
-  });
+  console.log("Dashboard JS loaded and ready.");
 });

@@ -118,11 +118,11 @@ header h2 {
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
 }
 
-/* Modal styling for node instructions and alarm addition */
-.modal {
+/* Modal styling for instructions */
+.modal.instruction-modal {
   display: none;
   position: fixed;
-  z-index: 200;
+  z-index: 100;
   left: 0;
   top: 0;
   width: 100%;
@@ -130,8 +130,7 @@ header h2 {
   background-color: var(--modal-bg);
   overflow: auto;
 }
-
-.modal-content {
+.modal-content.instruction-content {
   background-color: var(--modal-content-bg);
   margin: 10% auto;
   padding: 20px;
@@ -141,12 +140,13 @@ header h2 {
   border-radius: 8px;
   position: relative;
 }
-
-.modal-content h3 {
+.modal-content.instruction-content h3 {
   margin-top: 0;
 }
-
-.modal-content .close {
+.modal-content.instruction-content ol {
+  padding-left: 20px;
+}
+.modal-content.instruction-content .close {
   position: absolute;
   top: 10px;
   right: 10px;
@@ -155,11 +155,9 @@ header h2 {
   cursor: pointer;
   color: #aaa;
 }
-
-.modal-content .close:hover {
+.modal-content.instruction-content .close:hover {
   color: #000;
 }
-
 .create-new-btn {
   display: block;
   width: 100%;
@@ -172,7 +170,6 @@ header h2 {
   font-size: 1em;
   cursor: pointer;
 }
-
 .create-new-btn:hover {
   opacity: 0.9;
 }
@@ -192,4 +189,77 @@ header h2 {
 }
 .status-dot.offline {
   background-color: red;
+}
+
+/* Styles for alarms section */
+.alarms-container {
+  margin-top: 5px;
+  padding: 5px;
+  border: 1px dashed #ccc;
+}
+.alarm-entry {
+  border-bottom: 1px solid #eee;
+  padding: 5px 0;
+  font-size: 0.85em;
+}
+.alarm-entry span {
+  display: block;
+}
+.alarm-entry button {
+  background: #ff4f4f;
+  border: none;
+  color: #fff;
+  border-radius: 3px;
+  padding: 2px 5px;
+  font-size: 0.75em;
+  cursor: pointer;
+}
+.add-alarm-btn {
+  margin-top: 5px;
+  padding: 4px 8px;
+  background: #4caf50;
+  border: none;
+  color: #fff;
+  border-radius: 4px;
+  font-size: 0.9em;
+  cursor: pointer;
+}
+.add-alarm-btn:hover {
+  opacity: 0.9;
+}
+.add-alarm-form {
+  margin-top: 5px;
+  padding: 5px;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  font-size: 0.85em;
+}
+.add-alarm-form input[type="time"],
+.add-alarm-form select {
+  margin: 3px 0;
+  padding: 2px 4px;
+  font-size: 0.85em;
+}
+.alarm-days {
+  margin: 3px 0;
+}
+.alarm-days label {
+  font-size: 0.75em;
+  margin-right: 3px;
+}
+.alarm-form-buttons button {
+  padding: 2px 4px;
+  font-size: 0.8em;
+  margin-right: 5px;
+  border: none;
+  border-radius: 3px;
+  cursor: pointer;
+}
+.alarm-form-buttons button.save-btn {
+  background: #4caf50;
+  color: #fff;
+}
+.alarm-form-buttons button.cancel-btn {
+  background: #ff4f4f;
+  color: #fff;
 }
