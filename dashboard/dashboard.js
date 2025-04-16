@@ -163,35 +163,6 @@ function showAddAlarmForm(alarmsContainer, uid, deviceId) {
   alarmsContainer.appendChild(formDiv);
 }
 
-// Function to show the reset confirmation modal for factory reset
-function showResetModal(uid, deviceId) {
-  const resetModal = document.getElementById("resetModal");
-  resetModal.style.display = "block";
-  
-  // When the user clicks "Yes, Reset"
-  document.getElementById("confirmResetBtn").onclick = () => {
-    update(ref(getDatabase(), "users/" + uid + "/devices/" + deviceId), { reset: 1 })
-      .then(() => {
-        alert("Reset signal sent to device.");
-        resetModal.style.display = "none";
-      })
-      .catch(err => {
-        console.error("Error sending reset:", err);
-        resetModal.style.display = "none";
-      });
-  };
-  
-  // When the user cancels
-  document.getElementById("cancelResetBtn").onclick = () => {
-    resetModal.style.display = "none";
-  };
-  
-  // Also allow closing via the close icon
-  document.getElementById("closeResetModal").onclick = () => {
-    resetModal.style.display = "none";
-  };
-}
-
 document.addEventListener("DOMContentLoaded", () => {
   const addNodeBtn = document.getElementById("addNodeFloatingBtn");
   const instructionsModal = document.getElementById("nodeInstructionsModal");
@@ -201,6 +172,12 @@ document.addEventListener("DOMContentLoaded", () => {
   const userUIDSpan = document.getElementById("userUID");
   const displayNameSpan = document.getElementById("displayName");
   const deviceListDiv = document.getElementById("device-list");
+
+  // Elements for the Reset Confirmation Modal
+  const resetModal = document.getElementById("resetConfirmationModal");
+  const closeResetModal = document.getElementById("closeResetModal");
+  const confirmResetBtn = document.getElementById("confirmResetBtn");
+  const cancelResetBtn = document.getElementById("cancelResetBtn");
 
   const auth = getAuth();
   const db = getDatabase();
@@ -358,17 +335,28 @@ document.addEventListener("DOMContentLoaded", () => {
           clockContainer.appendChild(addAlarmBtn);
           deviceCard.appendChild(clockContainer);
   
-          // ----- Reconfigure Button (Factory Reset) -----
+          // ----- Reconfigure Button with Confirmation Modal -----
           const reconfigureBtn = document.createElement("button");
           reconfigureBtn.className = "reconfigure-btn";
           reconfigureBtn.textContent = "Reconfigure";
           reconfigureBtn.onclick = () => {
-            // Instead of directly calling update, show the reset confirmation modal.
-            showResetModal(uid, deviceId);
+            // Show the reset confirmation modal.
+            resetModal.style.display = "block";
+            // When user confirms the reset:
+            confirmResetBtn.onclick = () => {
+              update(ref(db, "users/" + uid + "/devices/" + deviceId), { reset: 1 })
+                .then(() => alert("Reset signal sent to device."))
+                .catch(err => alert("Error sending reset: " + err));
+              resetModal.style.display = "none";
+            };
+            // Set cancel behavior.
+            cancelResetBtn.onclick = closeResetModal.onclick = () => {
+              resetModal.style.display = "none";
+            };
           };
           deviceCard.appendChild(reconfigureBtn);
   
-          // ----- Feedback: Switch feedback display -----
+          // ----- Feedback: Display current switch feedback -----
           const feedbackPara = document.createElement("p");
           feedbackPara.className = "feedback-status";
           feedbackPara.textContent = "Feedback: " + ((deviceData.switchFeedback == 1) ? "ON" : "OFF");
@@ -441,6 +429,7 @@ document.addEventListener("DOMContentLoaded", () => {
       .catch((err) => {
         console.error("Failed to copy UID:", err);
       });
+  
   });
   
   console.log("Dashboard JS loaded and ready.");
