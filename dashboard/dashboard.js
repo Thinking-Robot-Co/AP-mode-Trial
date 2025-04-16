@@ -141,7 +141,6 @@ function showAddAlarmForm(alarmsContainer, uid, deviceId) {
     update(ref(getDatabase(), "users/" + uid + "/devices/" + deviceId + "/alarms/" + alarmId), alarmData)
       .then(() => {
         console.log("Alarm saved");
-        // Clear the editing flag and remove the form after saving
         globalEditingAlarm = false;
         formDiv.remove();
       })
@@ -155,7 +154,6 @@ function showAddAlarmForm(alarmsContainer, uid, deviceId) {
   cancelBtn.className = "cancel-btn";
   cancelBtn.textContent = "Cancel";
   cancelBtn.onclick = () => {
-    // Clear the editing flag and remove the form if canceled
     globalEditingAlarm = false;
     formDiv.remove();
   };
@@ -174,6 +172,12 @@ document.addEventListener("DOMContentLoaded", () => {
   const userUIDSpan = document.getElementById("userUID");
   const displayNameSpan = document.getElementById("displayName");
   const deviceListDiv = document.getElementById("device-list");
+
+  // Elements for the Reset Confirmation Modal
+  const resetModal = document.getElementById("resetConfirmationModal");
+  const closeResetModal = document.getElementById("closeResetModal");
+  const confirmResetBtn = document.getElementById("confirmResetBtn");
+  const cancelResetBtn = document.getElementById("cancelResetBtn");
 
   const auth = getAuth();
   const db = getDatabase();
@@ -195,12 +199,10 @@ document.addEventListener("DOMContentLoaded", () => {
   });
   
   function loadDeviceList(uid) {
-    // If currently editing an alarm, do not re-render the device list.
     if (globalEditingAlarm) return;
     
     const devicesRef = ref(db, "users/" + uid + "/devices");
     onValue(devicesRef, snapshot => {
-      // Only re-render if not editing (to preserve any open add‑alarm forms)
       if (globalEditingAlarm) return;
       deviceListDiv.innerHTML = "";
       if (snapshot.exists()) {
@@ -333,13 +335,24 @@ document.addEventListener("DOMContentLoaded", () => {
           clockContainer.appendChild(addAlarmBtn);
           deviceCard.appendChild(clockContainer);
   
-          // ----- Reconfigure Button -----
+          // ----- Reconfigure Button with Confirmation Modal -----
           const reconfigureBtn = document.createElement("button");
           reconfigureBtn.className = "reconfigure-btn";
           reconfigureBtn.textContent = "Reconfigure";
           reconfigureBtn.onclick = () => {
-            update(ref(db, "users/" + uid + "/devices/" + deviceId), { reset: 1 });
-            alert("Reset signal sent to device.");
+            // Show the reset confirmation modal.
+            resetModal.style.display = "block";
+            // When user confirms the reset:
+            confirmResetBtn.onclick = () => {
+              update(ref(db, "users/" + uid + "/devices/" + deviceId), { reset: 1 })
+                .then(() => alert("Reset signal sent to device."))
+                .catch(err => alert("Error sending reset: " + err));
+              resetModal.style.display = "none";
+            };
+            // Set cancel behavior.
+            cancelResetBtn.onclick = closeResetModal.onclick = () => {
+              resetModal.style.display = "none";
+            };
           };
           deviceCard.appendChild(reconfigureBtn);
   
@@ -416,6 +429,7 @@ document.addEventListener("DOMContentLoaded", () => {
       .catch((err) => {
         console.error("Failed to copy UID:", err);
       });
+  
   });
   
   console.log("Dashboard JS loaded and ready.");

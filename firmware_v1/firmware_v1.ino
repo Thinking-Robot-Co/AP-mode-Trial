@@ -231,10 +231,10 @@ void setupSTAMode() {
     Firebase.setInt(fbdo, devicePath + "/timerDuration", 1);
     Firebase.setInt(fbdo, devicePath + "/timerFeedback", 0);
     // Clock mode flag; alarms can be added under "alarms"
-    Firebase.setInt(fbdo, devicePath + "/clock", 0);
+    // Firebase.setInt(fbdo, devicePath + "/clock", 0);
     
     // ---- Initialize NTP for clock mode ----
-    configTime(0, 0, "pool.ntp.org");
+    configTime(19800, 0, "pool.ntp.org");
     Serial.println("NTP time configured.");
     
   } else {
@@ -269,23 +269,35 @@ int parseTime(const char* timeStr) {
 // Check Alarms (Clock Mode): If clock mode is active, read alarms from Firebase and trigger actions
 // -------------------------
 void checkAlarms() {
+    Serial.println("Outside alarms");
   if (Firebase.getJSON(fbdo, devicePath + "/alarms")) {
+    Serial.println("Inside alarms");
     String payload = fbdo.payload();
-    DynamicJsonDocument doc(1024);
+    DynamicJsonDocument doc(2048);
     DeserializationError error = deserializeJson(doc, payload);
     if (error) {
-      Serial.println("Failed to parse alarms JSON");
+      Serial.println("Failed to parse alarms JSON: " + String(error.c_str()));
       return;
     }
     
-    // Get current local time
+    // Get current local time from NTP
     struct tm timeinfo;
     if (!getLocalTime(&timeinfo)) {
       Serial.println("Failed to get local time");
       return;
     }
+    char timeStr[64];
+    strftime(timeStr, sizeof(timeStr), "%c", &timeinfo);
+    Serial.print("Local Time: ");
+    Serial.println(timeStr);
+    
     int currentMinutes = timeinfo.tm_hour * 60 + timeinfo.tm_min;
     int currentDay = timeinfo.tm_wday; // 0 = Sunday, 6 = Saturday
+    Serial.print("Current minutes: ");
+    Serial.println(currentMinutes);
+    Serial.print("Current day (wday): ");
+    Serial.println(currentDay);
+    
     const char* dayKeys[] = {"sun","mon","tue","wed","thu","fri","sat"};
     
     JsonObject alarms = doc.as<JsonObject>();
@@ -298,6 +310,15 @@ void checkAlarms() {
       int onTimeMins = parseTime(onTimeStr);
       int offTimeMins = parseTime(offTimeStr);
       
+      Serial.print("Alarm ID: ");
+      Serial.println(alarmId);
+      Serial.print("On Time (mins): ");
+      Serial.println(onTimeMins);
+      Serial.print("Off Time (mins): ");
+      Serial.println(offTimeMins);
+      Serial.print("Repeat: ");
+      Serial.println(repeat);
+      
       bool triggerOn = false;
       bool triggerOff = false;
       
@@ -309,12 +330,11 @@ void checkAlarms() {
             triggerOn = true;
           }
         } else {
-          // "daily" and "none" trigger regardless of day
           triggerOn = true;
         }
       }
       
-      // Check off time (within one minute window)
+      // Check off time within one minute window
       if (abs(currentMinutes - offTimeMins) < 1) {
         triggerOff = true;
       }
@@ -324,9 +344,9 @@ void checkAlarms() {
         digitalWrite(SSR_PIN, HIGH);
         Firebase.setInt(fbdo, devicePath + "/switch", 1);
         Firebase.setInt(fbdo, devicePath + "/switchFeedback", 1);
-        Serial.print("Alarm triggered (on): ");
+        Serial.print("Alarm triggered (ON): ");
         Serial.println(alarmId);
-        // For one-time alarms, remove after triggering
+        // Remove one-time alarms after triggering
         if (strcmp(repeat, "none") == 0) {
           Firebase.deleteNode(fbdo, devicePath + "/alarms/" + String(alarmId));
           Serial.print("One-time alarm removed: ");
@@ -339,10 +359,10 @@ void checkAlarms() {
         digitalWrite(SSR_PIN, LOW);
         Firebase.setInt(fbdo, devicePath + "/switch", 0);
         Firebase.setInt(fbdo, devicePath + "/switchFeedback", 0);
-        Serial.print("Alarm triggered (off): ");
+        Serial.print("Alarm triggered (OFF): ");
         Serial.println(alarmId);
       }
-    } // end for each alarm
+    }
   } else {
     Serial.println("Failed to get alarms: " + fbdo.errorReason());
   }
@@ -491,8 +511,9 @@ void loop() {
       
       // --- Clock Mode (Alarms) Section ---
       // Check alarms every 60 seconds
-      if (millis() - lastClockCheckMillis > 60000) {
+      if (millis() - lastClockCheckMillis > 5000) {  
         lastClockCheckMillis = millis();
+        Serial.println("Checking alarms");
         if (Firebase.getInt(fbdo, devicePath + "/clock")) {
           int clockFlag = fbdo.intData();
           if (clockFlag == 1) {
