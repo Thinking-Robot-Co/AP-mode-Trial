@@ -9,6 +9,9 @@ function formatTime(seconds) {
   return m + " min " + s + " sec";
 }
 
+// Global flag to suspend re-rendering during alarm editing
+let globalEditingAlarm = false;
+
 // Render a single alarm entry
 function renderAlarmEntry(alarmObj, alarmId, uid, deviceId) {
   const entryDiv = document.createElement("div");
@@ -44,6 +47,9 @@ function renderAlarmEntry(alarmObj, alarmId, uid, deviceId) {
 
 // Show an inline form to add a new alarm; on submit update Firebase
 function showAddAlarmForm(alarmsContainer, uid, deviceId) {
+  // Set editing flag so that onValue does not re-render
+  globalEditingAlarm = true;
+  
   // Create a form div
   const formDiv = document.createElement("div");
   formDiv.className = "add-alarm-form";
@@ -135,16 +141,22 @@ function showAddAlarmForm(alarmsContainer, uid, deviceId) {
     update(ref(getDatabase(), "users/" + uid + "/devices/" + deviceId + "/alarms/" + alarmId), alarmData)
       .then(() => {
         console.log("Alarm saved");
-        // Remove form after saving
+        // Clear the editing flag and remove the form after saving
+        globalEditingAlarm = false;
         formDiv.remove();
       })
-      .catch(err => console.error("Error saving alarm:", err));
+      .catch(err => {
+        console.error("Error saving alarm:", err);
+      });
   };
   btnDiv.appendChild(saveBtn);
+  
   const cancelBtn = document.createElement("button");
   cancelBtn.className = "cancel-btn";
   cancelBtn.textContent = "Cancel";
   cancelBtn.onclick = () => {
+    // Clear the editing flag and remove the form if canceled
+    globalEditingAlarm = false;
     formDiv.remove();
   };
   btnDiv.appendChild(cancelBtn);
@@ -183,8 +195,13 @@ document.addEventListener("DOMContentLoaded", () => {
   });
   
   function loadDeviceList(uid) {
+    // If currently editing an alarm, do not re-render the device list.
+    if (globalEditingAlarm) return;
+    
     const devicesRef = ref(db, "users/" + uid + "/devices");
     onValue(devicesRef, snapshot => {
+      // Only re-render if not editing (to preserve any open add‑alarm forms)
+      if (globalEditingAlarm) return;
       deviceListDiv.innerHTML = "";
       if (snapshot.exists()) {
         const devices = snapshot.val();
@@ -297,7 +314,7 @@ document.addEventListener("DOMContentLoaded", () => {
           clockLabel.textContent = " Clock/Alarm Mode";
           clockContainer.appendChild(clockLabel);
   
-          // Create alarms container and add-alarm button
+          // Alarms container and Add Alarm button
           const alarmsContainer = document.createElement("div");
           alarmsContainer.className = "alarms-container";
           if (deviceData.alarms) {
@@ -326,7 +343,7 @@ document.addEventListener("DOMContentLoaded", () => {
           };
           deviceCard.appendChild(reconfigureBtn);
   
-          // ----- Feedback: Switch feedback display -----
+          // ----- Feedback: Display current switch feedback -----
           const feedbackPara = document.createElement("p");
           feedbackPara.className = "feedback-status";
           feedbackPara.textContent = "Feedback: " + ((deviceData.switchFeedback == 1) ? "ON" : "OFF");
@@ -348,7 +365,7 @@ document.addEventListener("DOMContentLoaded", () => {
             alivePara.textContent = "Heartbeat: " + deviceData.alive;
             deviceCard.appendChild(alivePara);
           }
-          
+  
           deviceListDiv.appendChild(deviceCard);
         });
       } else {
@@ -357,7 +374,6 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   }
   
-  // Heartbeat interval
   setInterval(() => {
     const deviceCards = document.querySelectorAll(".device-card");
     const now = Date.now();
@@ -374,7 +390,6 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   }, 2000);
   
-  // Modal events
   addNodeBtn.addEventListener("click", () => {
     instructionsModal.style.display = "block";
   });
